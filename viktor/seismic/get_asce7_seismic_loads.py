@@ -2,6 +2,8 @@ import requests
 import json
 import os
 import numpy as np
+import plotly.graph_objects as go
+import pandas as pd
 
 def fetch_usgs_data(latitude, longitude, code,riskCategory, siteClass):
     
@@ -56,7 +58,7 @@ def calculate_floor_mass(story_floor_area, SD, SW, LL):
 
 def get_seismic_force(story_elevations, story_floor_area, SD, SW, LL, R, latitude, longitude, code, riskCategory,siteClass, spectrum_type=None, T_optional = None):
     
-    total_height = story_elevations[-1] - story_elevations[0]
+    total_height = story_elevations[0] - story_elevations[-1]
     T = 0.016*(total_height**0.7)
 
     multiperiod_design_spectrum_df, multiperiod_mce_spectrum_df, two_period_design_spectrum_df, two_period_mce_spectrum_df = fetch_usgs_data(latitude, longitude, code, riskCategory,siteClass)
@@ -101,20 +103,29 @@ def get_seismic_force(story_elevations, story_floor_area, SD, SW, LL, R, latitud
     for i in range(num_stories):
         cumulative_sum += floor_masses[i] * story_elevations[i]**k
 
-
+    current_shear_story = 0
+    shear_story = []
     for i in range(num_stories):
         
         cvx = floor_masses[i] * story_elevations[i]**k / cumulative_sum
         story_load = cvx * base_shear
         story_seismic_loads.append(story_load)
-
+        current_shear_story+=story_load
+        shear_story.append(current_shear_story)
+    
+    # Plot the shear story
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=shear_story, y=story_elevations, mode='lines+markers'))
+    fig.update_layout(title='Shear Story vs Elevation', xaxis_title='Shear Story (kips)', yaxis_title='Elevation (ft)')
+    fig.show()
+    
     return story_seismic_loads
 
 if __name__ == '__main__':
     folder_path = os.path.dirname(os.path.abspath(__file__))
 
-    story_elevations = [0, 12, 24, 36, 48] #ft
-    story_floor_area = [10000, 10000, 10000, 10000, 10000] #ft2
+    story_elevations = [48, 36, 24, 12] #ft
+    story_floor_area = [10000, 10000, 10000, 10000] #ft2
     SD = 20 # psf
     SW = 70 # psf
     LL = 100 # psf
